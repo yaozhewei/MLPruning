@@ -8,7 +8,7 @@ Please install all the dependencies:
 pip install -r requirements.txt
 ```
 
-Then, please download the necessary dataset you need by yourself, e.g., QQP and MNLI. 
+Then, please download the necessary dataset you need by yourself, e.g., [QQP](https://www.kaggle.com/c/quora-question-pairs/data) and [MNLI](https://cims.nyu.edu/~sbowman/multinli/). 
 
 ### Training
 Afterward, you can train your own pruned model! First, for full model training:
