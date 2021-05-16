@@ -1,20 +1,6 @@
-# coding=utf-8
-# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
-# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
-#
+# This code is modified from https://github.com/huggingface/transformers/tree/master/examples/research_projects/movement-pruning
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-""" Masked BERT model configuration. It replicates the class `~transformers.BertConfig`
-and adapts it to the specificities of MaskedBert (`pruning_method`, `mask_init` and `mask_scale`."""
+# We add more functionalities as well as remove unnecessary functionalities
 
 
 import logging

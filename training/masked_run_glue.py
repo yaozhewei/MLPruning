@@ -1,3 +1,7 @@
+# This code is modified from https://github.com/huggingface/transformers/tree/master/examples/pytorch/text-classification
+# Licensed under the Apache License, Version 2.0 (the "License");
+# We add more functionalities as well as remove unnecessary functionalities
+
 import argparse
 import glob
 import json
