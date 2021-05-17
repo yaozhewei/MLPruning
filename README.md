@@ -6,10 +6,10 @@ MLPruning is a MultiLevel structured Pruning library for transformer-based model
 Please see [this paper](xxx) for more details on the MLPruning algorithm.
 
 ## For Training
-Please refer to the training folder for more details.
+Please refer to the [training folder](https://github.com/yaozhewei/MLPruning/tree/main/training) for more details.
 
 ## For Sparse Kernel Inference 
-Please refer to the inference folder for more details.
+Please refer to the [inference folder](https://github.com/yaozhewei/MLPruning/tree/main/inference) for more details.
 
 ## Citation
 MLPruning has been developed as part of the following paper. We appreciate it if you would please cite the following paper if you found the library useful for your work:
