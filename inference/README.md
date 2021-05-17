@@ -1,3 +1,5 @@
+Our sparse kenel is from [Triton](https://github.com/ptillet/triton).
+
 ## Usage
 
 ### Requirements
