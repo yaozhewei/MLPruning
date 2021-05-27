@@ -1,6 +1,5 @@
 torch
 transformer
-gpustats
 knockknock>=0.1.8.1
 h5py>=2.10.0
 numpy>=1.18.2

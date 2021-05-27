@@ -6,6 +6,7 @@ import torch
 from torch import autograd
 import math
 
+
 class TopKBinarizer(autograd.Function):
     """
     Top-k Binarizer.
@@ -35,7 +36,8 @@ class TopKBinarizer(autograd.Function):
                 Binary matrix of the same size as `inputs` acting as a mask (1 - the associated weight is
                 retained, 0 - the associated weight is pruned).
         """
-        # Get the subnetwork by sorting the inputs and using the top threshold %
+        # Get the subnetwork by sorting the inputs and using the top threshold
+        # %
         threshold = torch.sigmoid(threshold).item()
 
         mask = inputs.clone()
@@ -48,16 +50,18 @@ class TopKBinarizer(autograd.Function):
             flat_out[idx[j:]] = 0.
             flat_out[idx[:j]] = 1.
         else:
-            inputs = inputs.reshape(head_split, -1) # make it as a 12 x 64 matrix! Then do the sorting!
-            _, idx = inputs.sort(-1, descending=True) # the default is column-wise 
-            j = math.ceil(threshold * inputs.size(1)) 
+            # make it as a 12 x 64 matrix! Then do the sorting!
+            inputs = inputs.reshape(head_split, -1)
+            # the default is column-wise
+            _, idx = inputs.sort(-1, descending=True)
+            j = math.ceil(threshold * inputs.size(1))
 
-            # 
+            #
             flat_out = mask.reshape(head_split, -1)
             for i in range(head_split):
                 flat_out[i, idx[i, j:]] = 0.
                 flat_out[i, idx[i, :j]] = 1.
-        ctx.save_for_backward(mask) # we should try two things
+        ctx.save_for_backward(mask)  # we should try two things
 
         return mask
 
@@ -65,5 +69,3 @@ class TopKBinarizer(autograd.Function):
     def backward(ctx, gradOutput):
         mask, = ctx.saved_tensors
         return gradOutput, ((gradOutput * mask).sum()).view(-1), None
-
-

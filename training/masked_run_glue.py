@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import random
-import math 
+import math
 
 import numpy as np
 import torch
@@ -37,9 +37,16 @@ scaler = torch.cuda.amp.GradScaler()
 logger = logging.getLogger(__name__)
 
 MODEL_CLASSES = {
-    "bert": (BertConfig, BertForSequenceClassification, BertTokenizer),
-    "masked_bert": (MaskedBertConfig, MaskedBertForSequenceClassification, BertTokenizer),
+    "bert": (
+        BertConfig,
+        BertForSequenceClassification,
+        BertTokenizer),
+    "masked_bert": (
+        MaskedBertConfig,
+        MaskedBertForSequenceClassification,
+        BertTokenizer),
 }
+
 
 def set_seed(args):
     random.seed(args.seed)
@@ -48,16 +55,21 @@ def set_seed(args):
     if args.n_gpu > 0:
         torch.cuda.manual_seed_all(args.seed)
 
+
 def remain_param_compute(threshold_list):
     output = 0.
 
     attn, o_matrix, fc1, fc2 = threshold_list
-    output += torch.max(attn, torch.tensor(1/12.)).type(fc1.type()) * 3
-    output += torch.max(attn, torch.tensor(1/12.)).type(fc1.type()) * torch.max(o_matrix, torch.tensor(1/768.)).type(fc1.type())
-    output += torch.max(fc1, torch.tensor(1/3072.)).type(fc1.type()) * 4 
-    output += torch.max(fc1, torch.tensor(1/3072.)).type(fc1.type()) * torch.max(fc2, torch.tensor(1/768.)).type(fc1.type()) * 4
+    output += torch.max(attn, torch.tensor(1 / 12.)).type(fc1.type()) * 3
+    output += torch.max(attn, torch.tensor(1 / 12.)).type(fc1.type()) * \
+        torch.max(o_matrix, torch.tensor(1 / 768.)).type(fc1.type())
+    output += torch.max(fc1, torch.tensor(1 / 3072.)).type(fc1.type()) * 4
+    output += torch.max(fc1,
+                        torch.tensor(1 / 3072.)).type(fc1.type()) * torch.max(fc2,
+                                                                              torch.tensor(1 / 768.)).type(fc1.type()) * 4
 
     return output
+
 
 def regularization(model: nn.Module, threshold: float):
     threshold_list = []
@@ -69,12 +81,14 @@ def regularization(model: nn.Module, threshold: float):
     layer_num = 12
     block_num = len(threshold_list) // layer_num
     for i in range(12):
-        param_remain += remain_param_compute(threshold_list[i*block_num : (i+1) * block_num])
+        param_remain += remain_param_compute(
+            threshold_list[i * block_num: (i + 1) * block_num])
 
     if param_remain / 144. - threshold <= 0:
         reg_loss = param_remain * 0.
     else:
-        reg_loss = torch.square(param_remain / 144. - threshold) # 144 comes from count, use simple sqaure loss
+        # 144 comes from count, use simple sqaure loss
+        reg_loss = torch.square(param_remain / 144. - threshold)
 
     return reg_loss
 
@@ -82,8 +96,12 @@ def regularization(model: nn.Module, threshold: float):
 def train(args, train_dataset, model, tokenizer, teacher=None):
     """ Train the model """
     args.train_batch_size = args.per_gpu_train_batch_size * max(1, args.n_gpu)
-    train_sampler = RandomSampler(train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
-    train_dataloader = DataLoader(train_dataset, sampler=train_sampler, batch_size=args.train_batch_size)
+    train_sampler = RandomSampler(
+        train_dataset) if args.local_rank == -1 else DistributedSampler(train_dataset)
+    train_dataloader = DataLoader(
+        train_dataset,
+        sampler=train_sampler,
+        batch_size=args.train_batch_size)
 
     if args.max_steps > 0:
         t_total = args.max_steps
@@ -119,11 +137,14 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
         },
     ]
 
-
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
+    optimizer = AdamW(
+        optimizer_grouped_parameters,
+        lr=args.learning_rate,
+        eps=args.adam_epsilon)
     scheduler = get_linear_schedule_with_warmup(
-        optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total
-    )
+        optimizer,
+        num_warmup_steps=args.warmup_steps,
+        num_training_steps=t_total)
 
     # multi-gpu training (should be after apex fp16 initialization)
     if args.n_gpu > 1:
@@ -142,10 +163,11 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
     print("***** Running training *****")
     print(f"  Num examples = {len(train_dataset)}")
     print(f"  Num Epochs = {args.num_train_epochs}")
-    print(f"  Instantaneous batch size per GPU = {args.per_gpu_train_batch_size}")
+    print(
+        f"  Instantaneous batch size per GPU = {args.per_gpu_train_batch_size}")
     print(
         f"  Total train batch size (w. parallel, distributed) = {args.train_batch_size}",
-        
+
     )
     print(f"  Total optimization steps = {t_total}")
     # Distillation
@@ -169,7 +191,8 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
     set_seed(args)  # Added here for reproducibility
 
     for _ in train_iterator:
-        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
+        epoch_iterator = tqdm(train_dataloader, desc="Iteration",
+                              disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
 
             # Skip past any already trained steps if resuming training
@@ -179,20 +202,23 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
 
             model.train()
             batch = tuple(t.to(args.device) for t in batch)
-            
-            inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+
+            inputs = {
+                "input_ids": batch[0],
+                "attention_mask": batch[1],
+                "labels": batch[3]}
             if args.model_type != "distilbert":
                 inputs["token_type_ids"] = (
                     batch[2] if args.model_type in ["bert", "masked_bert", "xlnet", "albert"] else None
                 )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
 
-
             with torch.cuda.amp.autocast(enabled=args.fp16):
                 outputs = model(**inputs)
                 # print(outputs)
-                
+
                 if "masked" not in args.model_type:
-                    loss, logits_stu = outputs.loss, outputs.logits  # model outputs are always tuple in transformers (see doc)
+                    # model outputs are always tuple in transformers (see doc)
+                    loss, logits_stu = outputs.loss, outputs.logits
                 else:
                     loss, logits_stu, reps_stu, attentions_stu = outputs
 
@@ -208,57 +234,72 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
                         )
                         logits_tea = outputs_tea.logits
                         reps_tea, attentions_tea = outputs_tea.hidden_states, outputs_tea.attentions
-                        
+
                     teacher_layer_num = len(attentions_tea)
                     student_layer_num = len(attentions_stu)
                     assert teacher_layer_num % student_layer_num == 0
-                    layers_per_block = int(teacher_layer_num / student_layer_num)
-                    new_attentions_tea = [attentions_tea[i * layers_per_block + layers_per_block - 1]
-                                        for i in range(student_layer_num)]
+                    layers_per_block = int(
+                        teacher_layer_num / student_layer_num)
+                    new_attentions_tea = [attentions_tea[i *
+                                                         layers_per_block +
+                                                         layers_per_block -
+                                                         1] for i in range(student_layer_num)]
 
                     att_loss, rep_loss = 0, 0
-                    for student_att, teacher_att in zip(attentions_stu, new_attentions_tea):
-                        student_att = torch.where(student_att <= -1e2, torch.zeros_like(student_att).to(args.device),
-                                                  student_att)
-                        teacher_att = torch.where(teacher_att <= -1e2, torch.zeros_like(teacher_att).to(args.device),
-                                                  teacher_att)
+                    for student_att, teacher_att in zip(
+                            attentions_stu, new_attentions_tea):
+                        student_att = torch.where(
+                            student_att <= -1e2,
+                            torch.zeros_like(student_att).to(
+                                args.device),
+                            student_att)
+                        teacher_att = torch.where(
+                            teacher_att <= -1e2,
+                            torch.zeros_like(teacher_att).to(
+                                args.device),
+                            teacher_att)
 
-                        tmp_loss = F.mse_loss(student_att, teacher_att, reduction="mean",)
+                        tmp_loss = F.mse_loss(
+                            student_att, teacher_att, reduction="mean",)
                         att_loss += tmp_loss
 
-                    new_reps_tea = [reps_tea[i * layers_per_block] for i in range(student_layer_num + 1)]
+                    new_reps_tea = [reps_tea[i * layers_per_block]
+                                    for i in range(student_layer_num + 1)]
                     new_reps_stu = reps_stu
-                    for i_threp, (student_rep, teacher_rep) in enumerate(zip(new_reps_stu, new_reps_tea)):
-                        tmp_loss = F.mse_loss(student_rep, teacher_rep, reduction="mean",)
+                    for i_threp, (student_rep, teacher_rep) in enumerate(
+                            zip(new_reps_stu, new_reps_tea)):
+                        tmp_loss = F.mse_loss(
+                            student_rep, teacher_rep, reduction="mean",)
                         rep_loss += tmp_loss
 
                     loss_logits = F.kl_div(
-                            input=F.log_softmax(logits_stu / args.temperature, dim=-1),
-                            target=F.softmax(logits_tea / args.temperature, dim=-1),
-                            reduction="batchmean",
-                        ) * (args.temperature ** 2)
+                        input=F.log_softmax(logits_stu / args.temperature, dim=-1),
+                        target=F.softmax(logits_tea / args.temperature, dim=-1),
+                        reduction="batchmean",
+                    ) * (args.temperature ** 2)
 
-                    loss_distill = loss_logits + rep_loss + att_loss                    
+                    loss_distill = loss_logits + rep_loss + att_loss
                     loss = args.alpha_distil * loss_distill + args.alpha_ce * loss
 
             if args.final_threshold < 1:
                 # for pruning
-                regu_ = regularization(model=model, threshold=args.final_threshold)                
-                regu_lambda = max(args.final_lambda * regu_.item() / (1 - args.final_threshold) / (1 - args.final_threshold), 50)
+                regu_ = regularization(
+                    model=model, threshold=args.final_threshold)
+                regu_lambda = max(args.final_lambda * regu_.item() /
+                                  (1 - args.final_threshold) / (1 - args.final_threshold), 50)
                 if regu_.item() < 0.0003:
-                    # when the loss is very small, no need to pubnish it too much
-                    regu_lambda = 10. 
+                    # when the loss is very small, no need to pubnish it too
+                    # much
+                    regu_lambda = 10.
             else:
                 # For baseline training
                 regu_ = 0
-                regu_lambda = 0 
+                regu_lambda = 0
 
             loss = loss + regu_lambda * regu_
 
-
             if args.n_gpu > 1:
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
-
 
             if args.fp16:
                 scaler.scale(loss).backward()
@@ -267,7 +308,8 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
 
             tr_loss += loss.item()
             if True:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(
+                    model.parameters(), args.max_grad_norm)
 
                 if args.fp16:
                     scaler.step(optimizer)
@@ -278,16 +320,19 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
                 model.zero_grad()
                 global_step += 1
 
-                if args.local_rank in [-1, 0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
+                if args.local_rank in [
+                    -1,
+                        0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
                     logs = {}
-                    if (
-                        args.local_rank == -1 and args.evaluate_during_training
-                    ):  # Only evaluate when single GPU otherwise metrics may not average well
+                    # Only evaluate when single GPU otherwise metrics may not
+                    # average well
+                    if (args.local_rank == -
+                            1 and args.evaluate_during_training):
                         results = evaluate(args, model, tokenizer)
                         for key, value in results.items():
                             eval_key = "eval_{}".format(key)
                             logs[eval_key] = value
-                    
+
                     loss_scalar = (tr_loss - logging_loss) / args.logging_steps
                     learning_rate_scalar = scheduler.get_lr()
                     logs["learning_rate"] = learning_rate_scalar[0]
@@ -300,20 +345,21 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
                         logs["loss/distil_logits"] = loss_logits.item()
                         try:
                             logs["loss/distil_attns"] = att_loss.item()
-                        except:
+                        except BaseException:
                             logs["loss/distil_attns"] = 0
                         try:
                             logs["loss/distil_reps"] = rep_loss.item()
-                        except:
+                        except BaseException:
                             logs["loss/distil_reps"] = 0
-                        
-                    
+
                     logging_loss = tr_loss
                     print(f"step: {global_step}: {logs}")
 
-                if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
+                if args.local_rank in [-1,
+                                       0] and args.save_steps > 0 and global_step % args.save_steps == 0:
                     # Save model checkpoint
-                    output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
+                    output_dir = os.path.join(
+                        args.output_dir, "checkpoint-{}".format(global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = (
@@ -322,15 +368,24 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
 
-                    torch.save(args, os.path.join(output_dir, "training_args.bin"))
+                    torch.save(
+                        args, os.path.join(
+                            output_dir, "training_args.bin"))
                     print(f"Saving model checkpoint to {output_dir}")
 
-                    torch.save(optimizer.state_dict(), os.path.join(output_dir, "optimizer.pt"))
-                    torch.save(scheduler.state_dict(), os.path.join(output_dir, "scheduler.pt"))
+                    torch.save(
+                        optimizer.state_dict(), os.path.join(
+                            output_dir, "optimizer.pt"))
+                    torch.save(
+                        scheduler.state_dict(), os.path.join(
+                            output_dir, "scheduler.pt"))
                     if args.fp16:
-                        torch.save(scaler.state_dict(), os.path.join(output_dir, "scaler.pt"))
-                        
-                    print(f"Saving optimizer and scheduler states to {output_dir}")
+                        torch.save(
+                            scaler.state_dict(), os.path.join(
+                                output_dir, "scaler.pt"))
+
+                    print(
+                        f"Saving optimizer and scheduler states to {output_dir}")
 
             if args.max_steps > 0 and global_step > args.max_steps:
                 epoch_iterator.close()
@@ -344,20 +399,27 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
 
 def evaluate(args, model, tokenizer, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
-    eval_task_names = ("mnli", "mnli-mm") if args.task_name == "mnli" else (args.task_name,)
-    eval_outputs_dirs = (args.output_dir, args.output_dir + "/MM") if args.task_name == "mnli" else (args.output_dir,)
+    eval_task_names = (
+        "mnli", "mnli-mm") if args.task_name == "mnli" else (args.task_name,)
+    eval_outputs_dirs = (args.output_dir, args.output_dir +
+                         "/MM") if args.task_name == "mnli" else (args.output_dir,)
 
     results = {}
     for eval_task, eval_output_dir in zip(eval_task_names, eval_outputs_dirs):
-        eval_dataset = load_and_cache_examples(args, eval_task, tokenizer, evaluate=True)
+        eval_dataset = load_and_cache_examples(
+            args, eval_task, tokenizer, evaluate=True)
 
         if not os.path.exists(eval_output_dir) and args.local_rank in [-1, 0]:
             os.makedirs(eval_output_dir)
 
-        args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, args.n_gpu)
+        args.eval_batch_size = args.per_gpu_eval_batch_size * \
+            max(1, args.n_gpu)
         # Note that DistributedSampler samples randomly
         eval_sampler = SequentialSampler(eval_dataset)
-        eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+        eval_dataloader = DataLoader(
+            eval_dataset,
+            sampler=eval_sampler,
+            batch_size=args.eval_batch_size)
 
         # multi-gpu eval
         if args.n_gpu > 1 and not isinstance(model, torch.nn.DataParallel):
@@ -377,12 +439,15 @@ def evaluate(args, model, tokenizer, prefix=""):
             batch = tuple(t.to(args.device) for t in batch)
 
             with torch.no_grad():
-                inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+                inputs = {
+                    "input_ids": batch[0],
+                    "attention_mask": batch[1],
+                    "labels": batch[3]}
                 if args.model_type != "distilbert":
                     inputs["token_type_ids"] = (
                         batch[2] if args.model_type in ["bert", "masked_bert", "xlnet", "albert"] else None
                     )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
-                
+
                 outputs = model(**inputs)
                 tmp_eval_loss, logits = outputs[:2]
 
@@ -393,7 +458,8 @@ def evaluate(args, model, tokenizer, prefix=""):
                 out_label_ids = inputs["labels"].detach().cpu().numpy()
             else:
                 preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-                out_label_ids = np.append(out_label_ids, inputs["labels"].detach().cpu().numpy(), axis=0)
+                out_label_ids = np.append(
+                    out_label_ids, inputs["labels"].detach().cpu().numpy(), axis=0)
 
         eval_loss = eval_loss / nb_eval_steps
         if args.output_mode == "classification":
@@ -410,13 +476,17 @@ def evaluate(args, model, tokenizer, prefix=""):
         if entropy is not None:
             result["eval_avg_entropy"] = entropy
 
-        output_eval_file = os.path.join(eval_output_dir, prefix, "eval_results.txt")
+        output_eval_file = os.path.join(
+            eval_output_dir, prefix, "eval_results.txt")
 
     return results
 
+
 def load_and_cache_examples(args, task, tokenizer, evaluate=False):
     if args.local_rank not in [-1, 0] and not evaluate:
-        torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
+        # Make sure only the first process in distributed training process the
+        # dataset, and the others will use the cache
+        torch.distributed.barrier()
 
     processor = processors[task]()
     output_mode = output_modes[task]
@@ -434,12 +504,15 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
         features = torch.load(cached_features_file)
     else:
         label_list = processor.get_labels()
-        if task in ["mnli", "mnli-mm"] and args.model_type in ["roberta", "xlmroberta"]:
+        if task in ["mnli",
+                    "mnli-mm"] and args.model_type in ["roberta",
+                                                       "xlmroberta"]:
             # HACK(label indices are swapped in RoBERTa pretrained model)
             label_list[1], label_list[2] = label_list[2], label_list[1]
         examples = (
-            processor.get_dev_examples(args.data_dir) if evaluate else processor.get_train_examples(args.data_dir)
-        )
+            processor.get_dev_examples(
+                args.data_dir) if evaluate else processor.get_train_examples(
+                args.data_dir))
         features = convert_examples_to_features(
             examples,
             tokenizer,
@@ -451,18 +524,29 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
             torch.save(features, cached_features_file)
 
     if args.local_rank == 0 and not evaluate:
-        torch.distributed.barrier()  # Make sure only the first process in distributed training process the dataset, and the others will use the cache
+        # Make sure only the first process in distributed training process the
+        # dataset, and the others will use the cache
+        torch.distributed.barrier()
 
     # Convert to Tensors and build dataset
-    all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
-    all_attention_mask = torch.tensor([f.attention_mask for f in features], dtype=torch.long)
-    all_token_type_ids = torch.tensor([f.token_type_ids for f in features], dtype=torch.long)
+    all_input_ids = torch.tensor(
+        [f.input_ids for f in features], dtype=torch.long)
+    all_attention_mask = torch.tensor(
+        [f.attention_mask for f in features], dtype=torch.long)
+    all_token_type_ids = torch.tensor(
+        [f.token_type_ids for f in features], dtype=torch.long)
     if output_mode == "classification":
-        all_labels = torch.tensor([f.label for f in features], dtype=torch.long)
+        all_labels = torch.tensor(
+            [f.label for f in features], dtype=torch.long)
     elif output_mode == "regression":
-        all_labels = torch.tensor([f.label for f in features], dtype=torch.float)
+        all_labels = torch.tensor(
+            [f.label for f in features], dtype=torch.float)
 
-    dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels)
+    dataset = TensorDataset(
+        all_input_ids,
+        all_attention_mask,
+        all_token_type_ids,
+        all_labels)
     return dataset
 
 
@@ -482,7 +566,9 @@ def main():
         default=None,
         type=str,
         required=True,
-        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
+        help="Model type selected in the list: " +
+        ", ".join(
+            MODEL_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_name_or_path",
@@ -496,7 +582,9 @@ def main():
         default=None,
         type=str,
         required=True,
-        help="The name of the task to train selected in the list: " + ", ".join(processors.keys()),
+        help="The name of the task to train selected in the list: " +
+        ", ".join(
+            processors.keys()),
     )
     parser.add_argument(
         "--output_dir",
@@ -531,8 +619,14 @@ def main():
         help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.",
     )
-    parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
-    parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
+    parser.add_argument(
+        "--do_train",
+        action="store_true",
+        help="Whether to run training.")
+    parser.add_argument(
+        "--do_eval",
+        action="store_true",
+        help="Whether to run eval on the dev set.")
     parser.add_argument(
         "--evaluate_during_training",
         action="store_true",
@@ -556,7 +650,11 @@ def main():
         type=int,
         help="Batch size per GPU/CPU for evaluation.",
     )
-    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
+    parser.add_argument(
+        "--learning_rate",
+        default=5e-5,
+        type=float,
+        help="The initial learning rate for Adam.")
 
     # Pruning parameters
     parser.add_argument(
@@ -566,8 +664,10 @@ def main():
         help="The Adam initial learning rate of the mask scores.",
     )
     parser.add_argument(
-        "--final_threshold", default=0.7, type=float, help="Final value of the threshold (for scheduling)."
-    )
+        "--final_threshold",
+        default=0.7,
+        type=float,
+        help="Final value of the threshold (for scheduling).")
 
     parser.add_argument(
         "--head_pruning", action="store_true", help="Head Pruning or not",
@@ -586,8 +686,10 @@ def main():
         help="Initialization method for the mask scores. Choices: constant, uniform, kaiming.",
     )
     parser.add_argument(
-        "--mask_scale", default=0.0, type=float, help="Initialization parameter for the chosen initialization method."
-    )
+        "--mask_scale",
+        default=0.0,
+        type=float,
+        help="Initialization parameter for the chosen initialization method.")
 
     parser.add_argument(
         "--final_lambda",
@@ -610,18 +712,36 @@ def main():
         help="Path to the already fine-tuned teacher model. Only for distillation.",
     )
     parser.add_argument(
-        "--alpha_ce", default=0.1, type=float, help="Cross entropy loss linear weight. Only for distillation."
-    )
+        "--alpha_ce",
+        default=0.1,
+        type=float,
+        help="Cross entropy loss linear weight. Only for distillation.")
     parser.add_argument(
-        "--alpha_distil", default=0.9, type=float, help="Distillation loss linear weight. Only for distillation."
-    )
+        "--alpha_distil",
+        default=0.9,
+        type=float,
+        help="Distillation loss linear weight. Only for distillation.")
     parser.add_argument(
-        "--temperature", default=2.0, type=float, help="Distillation temperature. Only for distillation."
-    )
+        "--temperature",
+        default=2.0,
+        type=float,
+        help="Distillation temperature. Only for distillation.")
 
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
+    parser.add_argument(
+        "--weight_decay",
+        default=0.0,
+        type=float,
+        help="Weight decay if we apply some.")
+    parser.add_argument(
+        "--adam_epsilon",
+        default=1e-8,
+        type=float,
+        help="Epsilon for Adam optimizer.")
+    parser.add_argument(
+        "--max_grad_norm",
+        default=1.0,
+        type=float,
+        help="Max gradient norm.")
     parser.add_argument(
         "--num_train_epochs",
         default=3.0,
@@ -630,15 +750,31 @@ def main():
     )
     parser.add_argument(
         "--max_steps",
-        default=-1,
+        default=-
+        1,
         type=int,
         help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
+    parser.add_argument(
+        "--warmup_steps",
+        default=0,
+        type=int,
+        help="Linear warmup over warmup_steps.")
 
-    parser.add_argument("--logging_steps", type=int, default=50, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
-    parser.add_argument("--no_cuda", action="store_true", help="Avoid using CUDA when available")
+    parser.add_argument(
+        "--logging_steps",
+        type=int,
+        default=50,
+        help="Log every X updates steps.")
+    parser.add_argument(
+        "--save_steps",
+        type=int,
+        default=1000,
+        help="Save checkpoint every X updates steps.")
+    parser.add_argument(
+        "--no_cuda",
+        action="store_true",
+        help="Avoid using CUDA when available")
     parser.add_argument(
         "--overwrite_output_dir",
         action="store_true",
@@ -649,13 +785,18 @@ def main():
         action="store_true",
         help="Overwrite the cached training and evaluation sets",
     )
-    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="random seed for initialization")
     parser.add_argument(
         "--fp16",
         action="store_true",
         help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit",
     )
-    parser.add_argument("--local_rank", type=int, default=-1, help="For distributed training: local_rank")
+    parser.add_argument("--local_rank", type=int, default=-
+                        1, help="For distributed training: local_rank")
 
     args = parser.parse_args()
 
@@ -671,7 +812,8 @@ def main():
 
     # Setup CUDA, GPU & distributed training
     if args.local_rank == -1 or args.no_cuda:
-        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+        device = torch.device(
+            "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
         args.n_gpu = 0 if args.no_cuda else torch.cuda.device_count()
     else:  # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
         torch.cuda.set_device(args.local_rank)
@@ -694,7 +836,9 @@ def main():
 
     # Load pretrained model and tokenizer
     if args.local_rank not in [-1, 0]:
-        torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
+        # Make sure only the first process in distributed training will
+        # download model & vocab
+        torch.distributed.barrier()
 
     args.model_type = args.model_type.lower()
     config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
@@ -708,7 +852,7 @@ def main():
         mask_scale=args.mask_scale,
         output_attentions=True,
         output_hidden_states=True,
-        head_pruning = args.head_pruning
+        head_pruning=args.head_pruning
     )
     tokenizer = tokenizer_class.from_pretrained(
         args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
@@ -727,7 +871,8 @@ def main():
         assert args.alpha_distil > 0.0
         assert args.alpha_distil + args.alpha_ce > 0.0
         teacher_config_class, teacher_model_class, _ = MODEL_CLASSES[args.teacher_type]
-        teacher_config = teacher_config_class.from_pretrained(args.teacher_name_or_path)
+        teacher_config = teacher_config_class.from_pretrained(
+            args.teacher_name_or_path)
         teacher_config.output_attentions = True
         teacher_config.output_hidden_states = True
         teacher = teacher_model_class.from_pretrained(
@@ -743,7 +888,9 @@ def main():
         teacher = None
 
     if args.local_rank == 0:
-        torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
+        # Make sure only the first process in distributed training will
+        # download model & vocab
+        torch.distributed.barrier()
 
     model.to(args.device)
     print(model)
@@ -751,11 +898,16 @@ def main():
 
     # Training
     if args.do_train:
-        train_dataset = load_and_cache_examples(args, args.task_name, tokenizer, evaluate=False)
-        global_step, tr_loss = train(args, train_dataset, model, tokenizer, teacher=teacher)
+        train_dataset = load_and_cache_examples(
+            args, args.task_name, tokenizer, evaluate=False)
+        global_step, tr_loss = train(
+            args, train_dataset, model, tokenizer, teacher=teacher)
 
-    # Saving best-practices: if you use defaults names for the model, you can reload it using from_pretrained()
-    if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+    # Saving best-practices: if you use defaults names for the model, you can
+    # reload it using from_pretrained()
+    if args.do_train and (
+            args.local_rank == -
+            1 or torch.distributed.get_rank() == 0):
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         model_to_save = (
@@ -764,12 +916,13 @@ def main():
         model_to_save.save_pretrained(args.output_dir)
         tokenizer.save_pretrained(args.output_dir)
 
-        # Good practice: save your training arguments together with the trained model
+        # Good practice: save your training arguments together with the trained
+        # model
         torch.save(args, os.path.join(args.output_dir, "training_args.bin"))
-    
 
         tmp_result = evaluate(args, model, tokenizer, prefix="")
         print(f"Final: {tmp_result}")
+
 
 if __name__ == "__main__":
     main()
