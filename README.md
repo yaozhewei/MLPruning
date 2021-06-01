@@ -15,7 +15,7 @@ Please refer to the [inference folder](https://github.com/yaozhewei/MLPruning/tr
 MLPruning has been developed as part of the following paper. We appreciate it if you would please cite the following paper if you found the library useful for your work:
 
 ```text
-@article{,
+@article{yao2021mlpruning,
   title={MLPruning: A Multilevel Structured Pruning Framework for Transformer-based Models},
   author={Yao, Zhewei and Lin, Jian and Shen, Sheg and Keutzer, Kurt and Mahoney, Michael W},
   journal={arXiv preprint arXiv:2105.14636},
