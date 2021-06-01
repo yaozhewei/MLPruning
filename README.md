@@ -3,7 +3,7 @@
 
 MLPruning is a MultiLevel structured Pruning library for transformer-based models. The library supports the training of BERT models with head/row pruning and block-wise sparsity pruning. Meanwhile, we also incorporate the block sparse MatMul from [Triton](https://github.com/ptillet/triton) to get the real speedup. 
 
-Please see [this paper](xxx) for more details on the MLPruning algorithm.
+Please see [this paper](https://arxiv.org/abs/2105.14636) for more details on the MLPruning algorithm.
 
 ## For Training
 Please refer to the [training folder](https://github.com/yaozhewei/MLPruning/tree/main/training) for more details.
@@ -16,9 +16,9 @@ MLPruning has been developed as part of the following paper. We appreciate it if
 
 ```text
 @article{,
-  title={},
-  author={},
-  journal={},
+  title={MLPruning: A Multilevel Structured Pruning Framework for Transformer-based Models},
+  author={Yao, Zhewei and Lin, Jian and Shen, Sheg and Keutzer, Kurt and Mahoney, Michael W},
+  journal={arXiv preprint arXiv:2105.14636},
   year={2021}
 }
 ```
