@@ -17,7 +17,7 @@ MLPruning has been developed as part of the following paper. We appreciate it if
 ```text
 @article{yao2021mlpruning,
   title={MLPruning: A Multilevel Structured Pruning Framework for Transformer-based Models},
-  author={Yao, Zhewei and Lin, Jian and Shen, Sheg and Keutzer, Kurt and Mahoney, Michael W},
+  author={Yao, Zhewei and Ma, Linjian and Shen, Sheng and Keutzer, Kurt and Mahoney, Michael W},
   journal={arXiv preprint arXiv:2105.14636},
   year={2021}
 }
